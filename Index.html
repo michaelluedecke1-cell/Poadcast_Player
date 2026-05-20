@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dein ultimativer Podcast & Radio Player</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#1e293b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-color: #38bdf8;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --input-bg: #334155;
+            --green-accent: #10b981;
+            --orange-accent: #f97316;
+            --red-accent: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .app-container {
+            background-color: var(--card-bg);
+            width: 100%;
+            max-width: 440px;
+            border-radius: 24px;
+            padding: 24px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .app-top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            background-color: #1a2232;
+            padding: 8px 12px;
+            border-radius: 12px;
+        }
+
+        .top-left-zone { display: flex; flex-direction: column; gap: 2px; }
+        .app-title { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: bold; }
+        .digital-clock { font-size: 1.1rem; font-weight: 700; color: var(--accent-color); font-family: monospace; }
+        .top-right-controls { display: flex; align-items: center; gap: 14px; }
+        
+        .wake-lock-btn {
+            background-color: var(--input-bg);
+            border: 1px solid #475569;
+            color: var(--text-muted);
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .wake-lock-btn.active {
+            background-color: #eab308; border-color: #eab308; color: #0f172a; box-shadow: 0 0 10px rgba(234, 179, 8, 0.4);
+        }
+
+        .nav-btn { background: none; border: none; color: var(--text-muted); font-size: 1.2rem; cursor: pointer; transition: color 0.2s; }
+        .nav-btn:hover, .nav-btn.active { color: var(--accent-color); }
+        .page { display: block; }
+        .page.hidden { display: none; }
+
+        /* --- PLAYER --- */
+        .podcast-header { text-align: center; margin-bottom: 15px; }
+        .cover-art {
+            width: 140px; height: 140px;
+            background: linear-gradient(135deg, #6366f1, #38bdf8);
+            border-radius: 16px; margin: 0 auto 14px;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 3.5rem; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+        }
+        .episode-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .podcast-title { color: var(--text-muted); font-size: 0.85rem; }
+        
+        .data-counter-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #1a2232;
+            padding: 6px 12px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .data-text-highlight { color: var(--orange-accent); font-weight: 700; font-family: monospace; }
+        .data-reset-btn { background: none; border: none; color: var(--accent-color); cursor: pointer; font-size: 0.75rem; font-weight: bold; }
+
+        .timeline-container { margin-bottom: 18px; }
+        .progress-bar { width: 100%; height: 6px; background-color: #475569; border-radius: 3px; cursor: pointer; position: relative; margin-bottom: 8px; }
+        .progress-fill { height: 100%; background-color: var(--accent-color); border-radius: 3px; width: 0%; }
+        .time-info { display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--text-muted); }
+        .controls { display: flex; justify-content: center; align-items: center; gap: 15px; margin-bottom: 20px; }
+        .btn { background: none; border: none; color: var(--text-main); cursor: pointer; font-size: 1rem; }
+        .btn-main { background-color: var(--text-main); color: var(--bg-color); width: 52px; height: 52px; border-radius: 50%; font-size: 1.2rem; display: flex; justify-content: center; align-items: center; font-weight: bold; }
+        .meta-controls { display: flex; justify-content: space-between; align-items: center; background-color: #1a2232; padding: 10px 16px; border-radius: 12px; margin-bottom: 16px; font-size: 0.85rem; }
+        
+        .timer-container { background-color: #1a2232; padding: 12px; border-radius: 12px; margin-bottom: 20px; text-align: center; }
+        .timer-title { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 8px; font-weight: 600; }
+        .timer-buttons { display: flex; justify-content: center; gap: 8px; }
+        .timer-btn { background-color: var(--input-bg); color: var(--text-main); border: 1px solid #475569; padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; }
+        .timer-btn.active { background-color: var(--orange-accent); border-color: var(--orange-accent); color: white; }
+
+        .search-container { margin-bottom: 12px; }
+        .search-input { width: 100%; padding: 8px 12px; background-color: #1a2232; border: 1px solid #334155; border-radius: 8px; color: var(--text-main); font-size: 0.85rem; outline: none; }
+
+        .tab-headers { display: flex; gap: 8px; border-bottom: 2px solid #334155; padding-bottom: 8px; margin-bottom: 12px; }
+        .tab-link { background: none; border: none; color: var(--text-muted); font-size: 0.85rem; font-weight: 600; cursor: pointer; padding: 4px 8px; }
+        .tab-link.active { color: var(--accent-color); border-bottom: 2px solid var(--accent-color); margin-bottom: -10px; }
+        .playlist-wrapper { max-height: 240px; overflow-y: auto; }
+        
+        .folder-group-header {
+            background-color: #1a2232; color: var(--accent-color); font-size: 0.8rem; font-weight: 700; padding: 6px 10px; margin: 8px 0 4px 0; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-left: 3px solid var(--accent-color);
+        }
+
+        .playlist-item {
+            display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 8px; cursor: pointer; margin-bottom: 4px; font-size: 0.85rem; background-color: rgba(255, 255, 255, 0.02);
+        }
+        .playlist-item:hover { background-color: #334155; }
+        .playlist-item.active { background-color: #2563eb; }
+        
+        .item-left-block { display: flex; flex-direction: column; max-width: 310px; overflow: hidden; }
+        .item-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
+        .item-status { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; display: flex; align-items: center; gap: 4px; }
+        .playlist-item.active .item-status { color: #e0f2fe; }
+
+        /* --- SEITE 2: MANAGEMENT --- */
+        .page-header-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+        .form-card { background-color: #1a2232; border-radius: 16px; padding: 18px; margin-bottom: 16px; }
+        .form-section-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 12px; }
+        .input-group { margin-bottom: 10px; }
+        .input-group label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 3px; }
+        .input-group input { width: 100%; padding: 8px 12px; background-color: var(--input-bg); border: 1px solid #475569; border-radius: 6px; color: var(--text-main); font-size: 0.85rem; outline: none; }
+        
+        /* --- SEITE 3: BACKUP --- */
+        .settings-section { background-color: #1a2232; padding: 16px; border-radius: 14px; margin-bottom: 16px; }
+        .section-title { font-size: 0.9rem; font-weight: 700; margin-bottom: 6px; }
+        .section-desc { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 14px; line-height: 1.4; }
+
+        .action-btn { width: 100%; padding: 10px; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 0.85rem; transition: opacity 0.2s; margin-bottom: 8px; }
+        .action-btn:last-child { margin-bottom: 0; }
+        .action-btn:hover { opacity: 0.9; }
+        .btn-blue { background-color: var(--accent-color); color: #0f172a; }
+        .btn-green { background-color: var(--green-accent); }
+        .btn-red { background-color: var(--red-accent); }
+        .btn-orange { background-color: var(--orange-accent); }
+        .btn-outline { background: none; border: 1px solid #475569; color: var(--text-main); }
+        .btn-outline:hover { background-color: #334155; }
+        
+        #file-input, #folder-input, #backup-input { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="player-container app-container">
+    <audio id="audio-player"></audio>
+
+    <div class="app-top-bar">
+        <div class="top-left-zone">
+            <div class="app-title" id="bar-title">Podcast Player</div>
+            <div class="digital-clock" id="digital-clock">00:00:00</div>
+        </div>
+        <div class="top-right-controls">
+            <button class="wake-lock-btn" id="wake-lock-btn" onclick="toggleWakeLock()">💡 Screen On</button>
+            <button class="nav-btn active" id="nav-player" onclick="showPage('player')">📻</button>
+            <button class="nav-btn" id="nav-add" onclick="showPage('add')">➕</button>
+            <button class="nav-btn" id="nav-settings" onclick="showPage('settings')">⚙️</button>
+        </div>
+    </div>
+
+    <div id="page-player" class="page">
+        <div class="podcast-header">
+            <div class="cover-art" id="player-cover">📻</div>
+            <div class="episode-title" id="player-title">Keine Folge geladen</div>
+            <div class="podcast-title" id="player-author">Wähle eine Folge aus der Liste</div>
+        </div>
+
+        <div class="data-counter-bar">
+            <span id="data-label">📱 Datenverbrauch:</span>
+            <div>
+                <span class="data-text-highlight" id="data-usage-display">0.0 MB</span>
+                <button class="data-reset-btn" onclick="resetDataUsage()" style="margin-left: 10px;">🔄 Reset</button>
+            </div>
+        </div>
+
+        <div class="timeline-container">
+            <div class="progress-bar" id="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <div class="time-info">
+                <span id="time-current">0:00</span>
+                <span id="time-total">0:00</span>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn" id="btn-prev" onclick="playPrevious()">⏮</button>
+            <button class="btn" id="btn-skip-back">⟲ 15s</button>
+            <button class="btn btn-main" id="btn-play">▶</button>
+            <button class="btn" id="btn-skip-forward">30s ⟳</button>
+            <button class="btn" id="btn-next" onclick="playNext()">⏭</button>
+        </div>
+
+        <div class="meta-controls">
+            <div>🔊 <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="0.8" style="width: 70px;"></div>
+            <div>Tempo: 
+                <select style="background:none; border:none; color:var(--accent-color); font-weight:600; cursor:pointer;" id="speed-select">
+                    <option value="1">1.0x</option>
+                    <option value="1.25">1.25x</option>
+                    <option value="1.5">1.5x</option>
+                    <option value="2">2.0x</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="timer-container">
+            <div class="timer-title" id="timer-display">⏱️ Sleep Timer (Aus)</div>
+            <div class="timer-buttons">
+                <button class="timer-btn" onclick="setSleepTimer(15)">15 Min</button>
+                <button class="timer-btn" onclick="setSleepTimer(30)">30 Min</button>
+                <button class="timer-btn" onclick="setSleepTimer(60)">60 Min</button>
+                <button class="timer-btn" onclick="setSleepTimer(90)">90 Min</button>
+                <button class="timer-btn" style="color: #ef4444;" onclick="stopSleepTimer()">Aus</button>
+            </div>
+        </div>
+
+        <div class="search-container">
+            <input type="text" class="search-input" id="playlist-search" placeholder="🔍 Suchen in Liste..." oninput="renderCurrentTab()">
+        </div>
+
+        <div class="tab-system">
+            <div class="tab-headers">
+                <button class="tab-link active" onclick="switchTab('sd')">📁 Von SD-Karte</button>
+                <button class="tab-link" onclick="switchTab('web')">🌐 Internet & Radio</button>
+            </div>
+            <div class="playlist-wrapper">
+                <ul class="playlist" id="playlist-content"></ul>
+            </div>
+        </div>
+    </div>
+
+    <div id="page-add" class="page hidden">
+        <div class="page-header-title" style="color: var(--accent-color);">➕ Medien hinzufügen</div>
+        
+        <div class="form-card">
+            <div class="form-section-title" style="color: var(--green-accent);">📁 SD-Karten & Hörbuch Import</div>
+            <input type="file" id="file-input" accept="audio/*" multiple>
+            <button class="action-btn btn-green" onclick="document.getElementById('file-input').click()">📥 Einzelne MP3-Dateien wählen</button>
+            
+            <input type="file" id="folder-input" accept="audio/*" webkitdirectory directory multiple>
+            <button class="action-btn btn-green" style="background-color: #059669;" onclick="document.getElementById('folder-input').click()">🗂️ Ganzen Ordner einlesen (Hörbücher)</button>
+            
+            <button class="action-btn btn-red" style="margin-top: 15px;" onclick="clearEntireSDDatabase()">🗑️ Gesamte SD-Karten-Liste löschen</button>
+            
+            <div id="status-msg" style="font-size:0.75rem; color:var(--green-accent); margin-top:5px; display:none;">Speichere in Datenbank...</div>
+        </div>
+
+        <div class="form-card">
+            <div class="form-section-title" style="color: var(--accent-color);">🌐 Internet-Podcast & Radio-Link</div>
+            <form id="web-form">
+                <div class="input-group"><label for="title-input">Name des Senders / der Folge</label><input type="text" id="title-input" required></div>
+                <div class="input-group"><label for="url-input">Streaming-Link (URL)</label><input type="url" id="url-input" placeholder="https://..." required></div>
+                <button type="submit" class="action-btn btn-blue">🔗 In Internet-Liste speichern</button>
+            </form>
+        </div>
+        
+        <button class="action-btn btn-outline" style="margin-top: 5px;" onclick="showPage('player')">↩️ Zurück zum Player</button>
+    </div>
+
+    <div id="page-settings" class="page hidden">
+        <div class="page-header-title" style="color: var(--orange-accent);">⚙️ Datensicherung</div>
+        <div class="settings-section">
+            <div class="section-title" style="color: var(--orange-accent);">Gesamtes Backup kopieren</div>
+            <div class="section-desc">Sichert deine Internet-Liste **UND** alle prozentualen Hörbuch-Fortschritte (Häkchen) in einer Textdatei.</div>
+            <button class="action-btn btn-orange" onclick="exportBackup()">📤 Liste & Fortschritte sichern</button>
+        </div>
+        <div class="settings-section">
+            <div class="section-title" style="color: var(--accent-color);">Sicherung einspielen</div>
+            <div class="section-desc">Stellt deine Senderliste und alle gelesenen Spielstände auf diesem oder einem neuen Gerät wieder her.</div>
+            <button class="action-btn btn-outline" onclick="document.getElementById('backup-input').click()">📥 Backup-Datei laden</button>
+            <input type="file" id="backup-input" accept=".json">
+        </div>
+        <button class="action-btn btn-outline" style="margin-top: 5px;" onclick="showPage('player')">↩️ Zurück zum Player</button>
+    </div>
+</div>
+
+<script>
+    let db;
+    let currentTab = 'sd';
+    let timerId = null;
+    let timerCountdown = 0;
+    let wakeLock = null;
+    
+    let currentTrackSource = localStorage.getItem('p_source') || null;
+    let currentTrackId = localStorage.getItem('p_id') || null;
+    let currentBlobUrl = null;
+    
+    let loadedTracksInView = [];
+    let collapsedFolders = JSON.parse(localStorage.getItem('p_collapsed_folders')) || [];
+
+    let totalBytesUsed = parseFloat(localStorage.getItem('p_data_bytes_used')) || 0;
+    let lastAudioTime = 0;
+
+    let webEpisodes = JSON.parse(localStorage.getItem('p_web_list')) || [
+        { id: "https://wdr-1live-live.icecast.wdr.de/wdr/1live/live/mp3/128/stream.mp3", title: "Beispiel Radio: 1LIVE" }
+    ];
+
+    const audio = document.getElementById('audio-player');
+    const playBtn = document.getElementById('btn-play');
+    const progressBar = document.getElementById('progress-bar');
+    const progressFill = document.getElementById('progress-fill');
+    const timeCurrent = document.getElementById('time-current');
+    const timeTotal = document.getElementById('time-total');
+    const playlistContent = document.getElementById('playlist-content');
+    const fileInput = document.getElementById('file-input');
+    const folderInput = document.getElementById('folder-input');
+    const statusMsg = document.getElementById('status-msg');
+    const backupInput = document.getElementById('backup-input');
+    const playerCover = document.getElementById('player-cover');
+
+    window.showPage = function(pageName) {
+        document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(`page-${pageName}`).classList.remove('hidden');
+        document.getElementById(`nav-${pageName}`).classList.add('active');
+        const barTitle = document.getElementById('bar-title');
+        if (pageName === 'player') barTitle.textContent = "Podcast Player";
+        else if (pageName === 'add') barTitle.textContent = "Medien";
+        else if (pageName === 'settings') barTitle.textContent = "Sicherung";
+    }
+
+    function updateClock() {
+        const jetzt = new Date();
+        document.getElementById('digital-clock').textContent = 
+            `${String(jetzt.getHours()).padStart(2, '0')}:${String(jetzt.getMinutes()).padStart(2, '0')}:${String(jetzt.getSeconds()).padStart(2, '0')}`;
+    }
+    setInterval(updateClock, 1000); updateClock();
+
+    async function toggleWakeLock() {
+        const lockBtn = document.getElementById('wake-lock-btn');
+        if (wakeLock === null) {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    lockBtn.classList.add('active'); lockBtn.textContent = "🌞 Screen On";
+                    wakeLock.addEventListener('release', () => { if(wakeLock !== null) resetWakeLockUI(); });
+                }
+            } catch (err) { console.error(err); }
+        } else { wakeLock.release().then(() => resetWakeLockUI()); }
+    }
+    function resetWakeLockUI() { wakeLock = null; const lockBtn = document.getElementById('wake-lock-btn'); lockBtn.classList.remove('active'); lockBtn.textContent = "💡 Screen On"; }
+
+    window.exportBackup = function() {
+        if(!db) return;
+        db.transaction("local_tracks", "readonly").objectStore("local_tracks").getAll().onsuccess = (e) => {
+            const tracks = e.target.result;
+            const sdStats = tracks.map(t => ({ title: t.title, folderName: t.folderName, lastPosition: t.lastPosition, totalDuration: t.totalDuration }));
+            const backupPackage = { version: 2, webList: webEpisodes, sdStatistics: sdStats };
+            const dataStr = JSON.stringify(backupPackage, null, 2);
+            const blob = new Blob([dataStr], {type: "application/json"});
+            const url = URL.createObjectURL(blob);
+            const heute = new Date().toISOString().slice(0, 10);
+            const a = document.createElement('a');
+            a.href = url; a.download = `podcast_gesamt_backup_${heute}.json`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+        };
+    }
+
+    backupInput.addEventListener('change', (e) => {
+        const file = e.target.files[0]; if(!file) return;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+            try {
+                const importedData = JSON.parse(evt.target.result);
+                if (importedData.version === 2 && Array.isArray(importedData.webList)) {
+                    webEpisodes = importedData.webList; localStorage.setItem('p_web_list', JSON.stringify(webEpisodes));
+                    if (Array.isArray(importedData.sdStatistics) && db) {
+                        const tx = db.transaction("local_tracks", "readwrite"); const store = tx.objectStore("local_tracks");
+                        store.getAll().onsuccess = (event) => {
+                            const currentTracks = event.target.result;
+                            currentTracks.forEach(currentTrack => {
+                                const match = importedData.sdStatistics.find(stat => stat.title === currentTrack.title && stat.folderName === currentTrack.folderName);
+                                if (match) { currentTrack.lastPosition = match.lastPosition; currentTrack.totalDuration = match.totalDuration; store.put(currentTrack); }
+                            });
+                        };
+                    }
+                    renderCurrentTab(); alert("Gesamt-Backup eingespielt!"); showPage('player');
+                } else if (Array.isArray(importedData)) {
+                    webEpisodes = importedData; localStorage.setItem('p_web_list', JSON.stringify(webEpisodes));
+                    renderCurrentTab(); alert("Alte Radioliste importiert!"); showPage('player');
+                } else { alert("Falsches Format."); }
+            } catch(err) { alert("Ladefehler."); }
+        };
+        reader.readAsText(file); backupInput.value = '';
+    });
+
+    const dbRequest = indexedDB.open("SuperPodcastPlayer", 1);
+    dbRequest.onupgradeneeded = (e) => { e.target.result.createObjectStore("local_tracks", { keyPath: "id", autoIncrement: true }); };
+    dbRequest.onsuccess = (e) => { db = e.target.result; renderCurrentTab(); if(currentTrackId) loadTrack(currentTrackSource, currentTrackId, true); };
+
+    window.clearEntireSDDatabase = function() {
+        if(confirm("Möchtest du wirklich alle eingelesenen Hörbücher und SD-Karten-Dateien aus der App löschen?")) {
+            const tx = db.transaction("local_tracks", "readwrite");
+            tx.objectStore("local_tracks").clear().oncomplete = () => {
+                if(currentTrackSource === 'sd') {
+                    audio.src = ''; document.getElementById('player-title').textContent = "Keine Folge geladen"; playerCover.textContent = "📻";
+                    localStorage.removeItem('p_source'); localStorage.removeItem('p_id'); currentTrackId = null; currentTrackSource = null; updateDataUsageUI();
+                }
+                localStorage.removeItem('p_collapsed_folders'); collapsedFolders = [];
+                renderCurrentTab(); alert("Die SD-Karten-Liste wurde komplett geleert!"); showPage('player');
+            };
+        }
+    }
+
+    window.resetDataUsage = function() { totalBytesUsed = 0; localStorage.setItem('p_data_bytes_used', 0); updateDataUsageUI(); }
+
+    function updateDataUsageUI() {
+        const display = document.getElementById('data-usage-display'); const label = document.getElementById('data-label');
+        if (currentTrackSource === 'sd') { label.textContent = "📁 Speicherquelle:"; display.textContent = "Offline (0.0 MB)"; display.style.color = "var(--green-accent)"; } 
+        else { label.textContent = "📱 Datenverbrauch:"; const megabytes = (totalBytesUsed / (1024 * 1024)).toFixed(1); display.textContent = `${megabytes} MB`; display.style.color = "var(--orange-accent)"; }
+    }
+
+    window.setSleepTimer = function(minutes) {
+        stopSleepTimer();
+        document.querySelectorAll('.timer-btn').forEach(btn => { if(btn.textContent.includes(minutes)) btn.classList.add('active'); else btn.classList.remove('active'); });
+        timerCountdown = minutes * 60; updateTimerDisplay();
+        timerId = setInterval(() => { timerCountdown--; updateTimerDisplay(); if(timerCountdown <= 0) { audio.pause(); playBtn.textContent = "▶"; stopSleepTimer(); } }, 1000);
+    }
+    window.stopSleepTimer = function() { if(timerId) clearInterval(timerId); timerId = null; document.querySelectorAll('.timer-btn').forEach(btn => btn.classList.remove('active')); document.getElementById('timer-display').textContent = "⏱️ Sleep Timer (Aus)"; }
+    function updateTimerDisplay() { const mins = Math.floor(timerCountdown / 60); const secs = timerCountdown % 60; document.getElementById('timer-display').textContent = `⏳ Schließt in: ${mins}:${secs < 10 ? '0' : ''}${secs} Min`; }
+
+    window.switchTab = function(tabName) { currentTab = tabName; document.querySelectorAll('.tab-link').forEach(btn => { btn.classList.toggle('active', btn.getAttribute('onclick').includes(tabName)); }); renderCurrentTab(); }
+
+    window.toggleFolderGroup = function(folderName) {
+        if(collapsedFolders.includes(folderName)) { collapsedFolders = collapsedFolders.filter(f => f !== folderName); } 
+        else { collapsedFolders.push(folderName); }
+        localStorage.setItem('p_collapsed_folders', JSON.stringify(collapsedFolders)); renderCurrentTab();
+    }
+
+    function renderCurrentTab() {
+        playlistContent.innerHTML = ''; const searchWord = document.getElementById('playlist-search').value.toLowerCase();
+        if (currentTab === 'web') {
+            const filteredWeb = webEpisodes.filter(track => track.title.toLowerCase().includes(searchWord)); loadedTracksInView = filteredWeb.map(t => ({id: t.id, title: t.title}));
+            if(filteredWeb.length === 0) { playlistContent.innerHTML = '<li style="color:var(--text-muted); font-size:0.8rem; padding:10px;">Keine Einträge gefunden.</li>'; return; }
+            filteredWeb.forEach(track => { let savedSeconds = parseFloat(localStorage.getItem('time_web_' + track.id)) || 0; let duration = parseFloat(localStorage.getItem('duration_web_' + track.id)) || 0; createPlaylistItem(track.id, track.title, 'web', savedSeconds, duration); });
+        } else {
+            if(!db) return;
+            db.transaction("local_tracks", "readonly").objectStore("local_tracks").getAll().onsuccess = (e) => {
+                const tracks = e.target.result; const filteredSD = tracks.filter(track => track.title.toLowerCase().includes(searchWord)); loadedTracksInView = filteredSD.map(t => ({id: t.id, title: t.title}));
+                if(filteredSD.length === 0) { playlistContent.innerHTML = '<li style="color:var(--text-muted); font-size:0.8rem; padding:10px;">Keine Dateien gefunden.</li>'; return; }
+                const groups = {}; filteredSD.forEach(track => { const folderName = track.folderName || "Einzelne Dateien"; if(!groups[folderName]) groups[folderName] = []; groups[folderName].push(track); });
+                for (const [folderName, folderTracks] of Object.entries(groups)) {
+                    const isCollapsed = collapsedFolders.includes(folderName) && searchWord === ""; const groupHeader = document.createElement('div'); groupHeader.className = 'folder-group-header'; groupHeader.innerHTML = `<span>📂 ${folderName} (${folderTracks.length})</span> <span>${isCollapsed ? '▼' : '▲'}</span>`; groupHeader.onclick = () => toggleFolderGroup(folderName); playlistContent.appendChild(groupHeader);
+                    if (!isCollapsed) { folderTracks.forEach(track => { createPlaylistItem(track.id, track.title, 'sd', track.lastPosition || 0, track.totalDuration || 0); }); }
+                }
+            };
+        }
+    }
+
+    function createPlaylistItem(id, title, type, currentPos, maxDuration) {
+        const li = document.createElement('li'); li.className = 'playlist-item'; if(currentTrackSource === type && String(currentTrackId) === String(id)) li.classList.add('active');
+        let prefix = type === 'sd' ? '📄' : '🌐'; let statusText = "🔵 Neu";
+        if(maxDuration > 5 && currentPos > 2) { let pct = Math.floor((currentPos / maxDuration) * 100); if(pct >= 97) statusText = "✅ Fertig"; else statusText = `⏳ ${pct}% gehört (${formatTime(currentPos)} / ${formatTime(maxDuration)})`; }
+        li.innerHTML = `<div class="item-left-block"><div class="item-title">${prefix} ${title}</div><div class="item-status" id="status-label-${type}-${id}">${statusText}</div></div><button class="btn" style="color:#ef4444; font-size:0.8rem;" onclick="deleteTrack(event, '${id}', '${type}')">❌</button>`;
+        li.addEventListener('click', () => { loadTrack(type, id, false); audio.addEventListener('canplay', function playOnLoad() { audio.play(); playBtn.textContent = "⏸"; audio.removeEventListener('canplay', playOnLoad); }); });
+        playlistContent.appendChild(li);
+    }
+
+    function loadTrack(source, id, isAppStart = false) {
+        currentTrackSource = source; currentTrackId = id; localStorage.setItem('p_source', source); localStorage.setItem('p_id', id); lastAudioTime = 0;
+        if (source === 'web') {
+            const track = webEpisodes.find(t => String(t.id) === String(id)); if(!track) return;
+            audio.src = track.id; document.getElementById('player-title').textContent = track.title; document.getElementById('player-author').textContent = "Internet / Live-Radio"; playerCover.textContent = "🌐"; updateActiveHighlighting(); let trackTime = parseFloat(localStorage.getItem('time_web_' + id)) || 0; applyTrackTime(trackTime);
+        } else {
+            if(!db) return;
+            db.transaction("local_tracks", "readonly").objectStore("local_tracks").get(Number(id)).onsuccess = (e) => {
+                const track = e.target.result; if(!track) return;
+                if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl); currentBlobUrl = URL.createObjectURL(track.fileData); audio.src = currentBlobUrl; document.getElementById('player-title').textContent = track.title; document.getElementById('player-author').textContent = track.folderName ? `📚 ${track.folderName}` : "SD-Karte"; playerCover.textContent = "📁"; updateActiveHighlighting(); let trackTime = track.lastPosition || 0; applyTrackTime(trackTime);
+            };
+        }
+        updateDataUsageUI();
+    }
+
+    function applyTrackTime(timeToSet) { if(timeToSet > 0) { audio.addEventListener('loadedmetadata', function timeSetter() { if (audio.duration && audio.duration !== Infinity) { audio.currentTime = timeToSet; } audio.removeEventListener('loadedmetadata', timeSetter); }); } }
+
+    function updateActiveHighlighting() { document.querySelectorAll('.playlist-item').forEach(item => item.classList.remove('active')); const elements = playlistContent.children; for(let el of elements) { if(el.innerHTML && el.innerHTML.includes(`deleteTrack(event, '${currentTrackId}', '${currentTrackSource}')`)) { el.classList.add('active'); } } }
+
+    window.playNext = function() {
+        if(loadedTracksInView.length <= 1 || !currentTrackId) return; let index = loadedTracksInView.findIndex(t => String(t.id) === String(currentTrackId));
+        if(index !== -1 && index < loadedTracksInView.length - 1) { let nextTrack = loadedTracksInView[index + 1]; loadTrack(currentTrackSource, nextTrack.id); audio.addEventListener('canplay', function p() { audio.play(); playBtn.textContent = "⏸"; audio.removeEventListener('canplay', p); }); }
+    }
+    window.playPrevious = function() {
+        if(loadedTracksInView.length <= 1 || !currentTrackId) return; let index = loadedTracksInView.findIndex(t => String(t.id) === String(currentTrackId));
+        if(index > 0) { let prevTrack = loadedTracksInView[index - 1]; loadTrack(currentTrackSource, prevTrack.id); audio.addEventListener('canplay', function p() { audio.play(); playBtn.textContent = "⏸"; audio.removeEventListener('canplay', p); }); }
+    }
+
+    audio.addEventListener('ended', () => { playNext(); });
+
+    function saveFilesToDB(fileList, isFolderImport = false) {
+        if(fileList.length === 0) return; statusMsg.style.display = "block"; const sortedFiles = Array.from(fileList).sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'})); const tx = db.transaction("local_tracks", "readwrite"); const store = tx.objectStore("local_tracks");
+        for(let i = 0; i < sortedFiles.length; i++) {
+            if (sortedFiles[i].type.startsWith('audio/') || sortedFiles[i].name.endsWith('.mp3')) {
+                let detectedFolder = "Einzelne Dateien"; if(isFolderImport && sortedFiles[i].webkitRelativePath) { const pathParts = sortedFiles[i].webkitRelativePath.split('/'); if(pathParts.length > 1) detectedFolder = pathParts[0]; }
+                store.add({ title: sortedFiles[i].name.replace(/\.[^/.]+$/, ""), fileData: sortedFiles[i], lastPosition: 0, totalDuration: 0, folderName: detectedFolder });
+            }
+        }
+        tx.oncomplete = () => { statusMsg.style.display = "none"; fileInput.value = ''; folderInput.value = ''; renderCurrentTab(); alert("Medien eingelesen!"); showPage('player'); };
+    }
+
+    fileInput.addEventListener('change', (e) => saveFilesToDB(e.target.files, false));
+    folderInput.addEventListener('change', (e) => saveFilesToDB(e.target.files, true));
+
+    document.getElementById('web-form').addEventListener('submit', (e) => {
+        e.preventDefault(); const url = document.getElementById('url-input').value; const title = document.getElementById('title-input').value; webEpisodes = webEpisodes.filter(t => t.id !== url); webEpisodes.push({ id: url, title: title }); localStorage.setItem('p_web_list', JSON.stringify(webEpisodes)); document.getElementById('web-form').reset(); switchTab('web'); loadTrack('web', url, false); alert("Link gespeichert!"); showPage('player');
+    });
+
+    window.deleteTrack = function(event, id, type) {
+        event.stopPropagation();
+        if(type === 'web') { webEpisodes = webEpisodes.filter(t => String(t.id) !== String(id)); localStorage.setItem('p_web_list', JSON.stringify(webEpisodes)); localStorage.removeItem('time_web_' + id); localStorage.removeItem('duration_web_' + id); checkIfCurrentDeleted(id, type); renderCurrentTab(); } 
+        else { db.transaction("local_tracks", "readwrite").objectStore("local_tracks").delete(Number(id)).oncomplete = () => { checkIfCurrentDeleted(id, type); renderCurrentTab(); }; }
+    }
+
+    function checkIfCurrentDeleted(id, type) { if(currentTrackSource === type && String(currentTrackId) === String(id)) { audio.src = ''; document.getElementById('player-title').textContent = "Keine Folge geladen"; playerCover.textContent = "📻"; localStorage.removeItem('p_source'); localStorage.removeItem('p_id'); currentTrackId = null; currentTrackSource = null; updateDataUsageUI(); } }
+
+    function togglePlay() { if(!audio.src) return; if (audio.paused) { audio.play(); playBtn.textContent = "⏸"; } else { audio.pause(); playBtn.textContent = "▶"; } }
+
+    audio.addEventListener('timeupdate', () => {
+        if(audio.duration && audio.duration !== Infinity) {
+            progressFill.style.width = `${(audio.currentTime / audio.duration) * 100}%`; timeCurrent.textContent = formatTime(audio.currentTime); timeTotal.textContent = formatTime(audio.duration);
+            let pct = Math.floor((audio.currentTime / audio.duration) * 100); let liveStatusText = pct >= 97 ? "✅ Fertig" : `⏳ ${pct}% gehört (${formatTime(audio.currentTime)} / ${formatTime(audio.duration)})`;
+
+            if (currentTrackSource === 'web' && currentTrackId) {
+                localStorage.setItem('time_web_' + currentTrackId, audio.currentTime); localStorage.setItem('duration_web_' + currentTrackId, audio.duration);
+                let label = document.getElementById(`status-label-web-${currentTrackId}`); if(label) label.textContent = liveStatusText;
+            } else if (currentTrackSource === 'sd' && db && currentTrackId) {
+                const tx = db.transaction("local_tracks", "readwrite"); const store = tx.objectStore("local_tracks");
+                store.get(Number(currentTrackId)).onsuccess = (e) => {
+                    const track = e.target.result; if(track) { track.lastPosition = audio.currentTime; track.totalDuration = audio.duration; store.put(track); let label = document.getElementById(`status-label-sd-${currentTrackId}`); if(label) label.textContent = liveStatusText; }
+                };
+            }
+        } else { timeCurrent.textContent = formatTime(audio.currentTime); timeTotal.textContent = "📻 Live"; }
+
+        if (currentTrackSource === 'web' && audio.currentTime > 0) {
+            if(lastAudioTime > 0 && audio.currentTime > lastAudioTime) {
+                const timePassed = audio.currentTime - lastAudioTime; const bytesPerSecond = 16000 * audio.playbackRate; const bytesUsedThisTick = timePassed * bytesPerSecond;
+                if (timePassed < 4) { totalBytesUsed += bytesUsedThisTick; localStorage.setItem('p_data_bytes_used', totalBytesUsed); updateDataUsageUI(); }
+            }
+            lastAudioTime = audio.currentTime;
+        }
+    });
+
+    function formatTime(seconds) { if(isNaN(seconds) || seconds === Infinity) return "0:00"; const mins = Math.floor(seconds / 60); const secs = Math.floor(seconds % 60); return `${mins}:${secs < 10 ? '0' : ''}${secs}`; }
+
+    progressBar.addEventListener('click', (e) => { if(audio.duration && audio.duration !== Infinity) audio.currentTime = (e.offsetX / progressBar.clientWidth) * audio.duration; });
+    document.getElementById('btn-skip-forward').addEventListener('click', () => audio.currentTime += 30);
+    document.getElementById('btn-skip-back').addEventListener('click', () => audio.currentTime -= 15);
+    document.getElementById('speed-select').addEventListener('change', (e) => audio.playbackRate = parseFloat(e.target.value));
+    document.getElementById('volume-slider').addEventListener('input', (e) => audio.volume = e.target.value);
+    playBtn.addEventListener('click', togglePlay);
+
+    // NEU: SERVICE WORKER REGISTRIERUNG FÜR PWA INSTALLATION
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('PWA ServiceWorker erfolgreich registriert!', reg))
+                .catch(err => console.log('ServiceWorker Fehler:', err));
+        });
+    }
+</script>
+</body>
+</html>
