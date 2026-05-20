@@ -463,7 +463,6 @@
         localStorage.setItem('p_collapsed_folders', JSON.stringify(collapsedFolders)); renderCurrentTab();
     }
 
-    // UPDATE: Zeigt jetzt bei einer komplett leeren Liste sofort die "Keine Dateien"-Meldung ohne Alt-Ordner an!
     function renderCurrentTab() {
         playlistContent.innerHTML = ''; const searchWord = document.getElementById('playlist-search').value.toLowerCase();
         if (currentTab === 'web') {
@@ -488,7 +487,16 @@
         const li = document.createElement('li'); li.className = 'playlist-item'; if(currentTrackSource === type && String(currentTrackId) === String(id)) li.classList.add('active');
         let prefix = type === 'sd' ? '📄' : '🌐'; let statusText = "🔵 Neu";
         if(maxDuration > 5 && currentPos > 2) { let pct = Math.floor((currentPos / maxDuration) * 100); if(pct >= 97) statusText = "✅ Fertig"; else statusText = `⏳ ${pct}% gehört (${formatTime(currentPos)} / ${formatTime(maxDuration)})`; }
-        li.innerHTML = `<div class="item-left-block"><div class="item-title">${prefix} ${title}</div><div class="item-status" id="status-label-${type}-${id}">${statusText}</div></div><button class="btn" style="color:#ef4444; font-size:0.8rem;" onclick="deleteTrack(event, '${id}', '${type}')">❌</button>`;
+        
+        // KORREKTUR: onclick im Button ruft jetzt sicher stopPropagation() auf
+        li.innerHTML = `
+            <div class="item-left-block">
+                <div class="item-title">${prefix} ${title}</div>
+                <div class="item-status" id="status-label-${type}-${id}">${statusText}</div>
+            </div>
+            <button class="btn" style="color:#ef4444; font-size:0.8rem; padding: 5px 10px;" onclick="deleteTrack(event, '${id}', '${type}')">❌</button>
+        `;
+        
         li.addEventListener('click', () => { loadTrack(type, id, false); audio.addEventListener('canplay', function playOnLoad() { audio.play(); playBtn.textContent = "⏸"; audio.removeEventListener('canplay', playOnLoad); }); });
         playlistContent.appendChild(li);
     }
@@ -541,10 +549,26 @@
         e.preventDefault(); const url = document.getElementById('url-input').value; const title = document.getElementById('title-input').value; webEpisodes = webEpisodes.filter(t => t.id !== url); webEpisodes.push({ id: url, title: title }); localStorage.setItem('p_web_list', JSON.stringify(webEpisodes)); document.getElementById('web-form').reset(); switchTab('web'); loadTrack('web', url, false); alert("Link gespeichert!"); showPage('player');
     });
 
+    // KORREKTUR: Trennung von Löschen und Abspielen komplett abgesichert
     window.deleteTrack = function(event, id, type) {
-        event.stopPropagation();
-        if(type === 'web') { webEpisodes = webEpisodes.filter(t => String(t.id) !== String(id)); localStorage.setItem('p_web_list', JSON.stringify(webEpisodes)); localStorage.removeItem('time_web_' + id); localStorage.removeItem('duration_web_' + id); checkIfCurrentDeleted(id, type); renderCurrentTab(); } 
-        else { db.transaction("local_tracks", "readwrite").objectStore("local_tracks").delete(Number(id)).oncomplete = () => { checkIfCurrentDeleted(id, type); renderCurrentTab(); }; }
+        event.preventDefault();
+        event.stopPropagation(); // Stoppt das Weiterreichen an die Zeile (kein Abspielen!)
+        
+        if(!confirm("Möchtest du diesen Eintrag wirklich löschen?")) return;
+
+        if(type === 'web') { 
+            webEpisodes = webEpisodes.filter(t => String(t.id) !== String(id)); 
+            localStorage.setItem('p_web_list', JSON.stringify(webEpisodes)); 
+            localStorage.removeItem('time_web_' + id); 
+            localStorage.removeItem('duration_web_' + id); 
+            checkIfCurrentDeleted(id, type); 
+            renderCurrentTab(); 
+        } else { 
+            db.transaction("local_tracks", "readwrite").objectStore("local_tracks").delete(Number(id)).oncomplete = () => { 
+                checkIfCurrentDeleted(id, type); 
+                renderCurrentTab(); 
+            }; 
+        }
     }
 
     function checkIfCurrentDeleted(id, type) { if(currentTrackSource === type && String(currentTrackId) === String(id)) { audio.src = ''; document.getElementById('player-title').textContent = "Keine Folge geladen"; playerCover.textContent = "📻"; localStorage.removeItem('p_source'); localStorage.removeItem('p_id'); currentTrackId = null; currentTrackSource = null; updateDataUsageUI(); } }
@@ -588,7 +612,7 @@
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('PWA ServiceWorker erfolgreich registriert!', reg))
+                .then(reg => console.log('PWA ServiceWorker registriert!', reg))
                 .catch(err => console.log('ServiceWorker Fehler:', err));
         });
     }
