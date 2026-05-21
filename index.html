@@ -179,7 +179,7 @@
 <body>
 
 <div class="player-container app-container">
-    <audio id="audio-player"></audio>
+    <audio id="audio-player" playsinline preload="auto"></audio>
 
     <div class="app-top-bar">
         <div class="top-left-zone">
@@ -311,7 +311,7 @@
 </div>
 
 <script>
-    let db;
+    let db = null;
     let currentTab = 'sd';
     let timerId = null;
     let timerCountdown = 0;
@@ -377,19 +377,17 @@
     function resetWakeLockUI() { wakeLock = null; const lockBtn = document.getElementById('wake-lock-btn'); lockBtn.classList.remove('active'); lockBtn.textContent = "💡 Screen On"; }
 
     window.exportBackup = function() {
-        if(!db) return;
+        if(!db) { alert("Datenbank nicht bereit. Backup kann nur Webliste sichern."); const dStr = JSON.stringify({version:2, webList:webEpisodes, sdStatistics:[]}); triggerDownload(dStr); return; }
         db.transaction("local_tracks", "readonly").objectStore("local_tracks").getAll().onsuccess = (e) => {
             const tracks = e.target.result;
             const sdStats = tracks.map(t => ({ title: t.title, folderName: t.folderName, lastPosition: t.lastPosition, totalDuration: t.totalDuration }));
             const backupPackage = { version: 2, webList: webEpisodes, sdStatistics: sdStats };
-            const dataStr = JSON.stringify(backupPackage, null, 2);
-            const blob = new Blob([dataStr], {type: "application/json"});
-            const url = URL.createObjectURL(blob);
-            const heute = new Date().toISOString().slice(0, 10);
-            const a = document.createElement('a');
-            a.href = url; a.download = `podcast_gesamt_backup_${heute}.json`;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+            triggerDownload(JSON.stringify(backupPackage, null, 2));
         };
+    }
+    function triggerDownload(str) {
+        const blob = new Blob([str], {type: "application/json"}); const url = URL.createObjectURL(blob); const heute = new Date().toISOString().slice(0, 10);
+        const a = document.createElement('a'); a.href = url; a.download = `podcast_gesamt_backup_${heute}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
     }
 
     backupInput.addEventListener('change', (e) => {
@@ -420,12 +418,18 @@
         reader.readAsText(file); backupInput.value = '';
     });
 
-    const dbRequest = indexedDB.open("SuperPodcastPlayer", 1);
-    dbRequest.onupgradeneeded = (e) => { e.target.result.createObjectStore("local_tracks", { keyPath: "id", autoIncrement: true }); };
-    dbRequest.onsuccess = (e) => { db = e.target.result; renderCurrentTab(); if(currentTrackId) loadTrack(currentTrackSource, currentTrackId, true); };
+    try {
+        const dbRequest = indexedDB.open("SuperPodcastPlayer", 1);
+        dbRequest.onupgradeneeded = (e) => { e.target.result.createObjectStore("local_tracks", { keyPath: "id", autoIncrement: true }); };
+        dbRequest.onsuccess = (e) => { db = e.target.result; renderCurrentTab(); if(currentTrackId) loadTrack(currentTrackSource, currentTrackId, true); };
+        dbRequest.onerror = (e) => { console.error("Datenbank blockiert:", e); alert("HINWEIS: Dein Browser blockiert das Speichern von Daten. Bitte öffne die App im normalen Modus (nicht Inkognito/InPrivate)!"); renderCurrentTab(); };
+    } catch(err) {
+        console.error("IndexedDB nicht unterstützt:", err);
+    }
 
     window.clearEntireSDDatabase = function() {
-        if(confirm("Möchtest du wirklich alle eingelesenen Hörbücher und SD-Karten-Dateien aus der App löschen?")) {
+        if(!db) { alert("Datenbank nicht active!"); return; }
+        if(confirm("Möchtest du wirklich alle eingelesenen Hörbücher aus der App löschen?")) {
             const tx = db.transaction("local_tracks", "readwrite");
             tx.objectStore("local_tracks").clear().oncomplete = () => {
                 if(currentTrackSource === 'sd') {
@@ -470,7 +474,7 @@
             if(filteredWeb.length === 0) { playlistContent.innerHTML = '<li style="color:var(--text-muted); font-size:0.8rem; padding:10px;">Keine Einträge gefunden.</li>'; return; }
             filteredWeb.forEach(track => { let savedSeconds = parseFloat(localStorage.getItem('time_web_' + track.id)) || 0; let duration = parseFloat(localStorage.getItem('duration_web_' + track.id)) || 0; createPlaylistItem(track.id, track.title, 'web', savedSeconds, duration); });
         } else {
-            if(!db) return;
+            if(!db) { playlistContent.innerHTML = '<li style="color:var(--red-accent); font-size:0.8rem; padding:10px; font-weight:bold;">⚠️ Fehler: Browser blockiert die Datenbank (Inkognito-Modus aktiv?).</li>'; return; }
             db.transaction("local_tracks", "readonly").objectStore("local_tracks").getAll().onsuccess = (e) => {
                 const tracks = e.target.result; const filteredSD = tracks.filter(track => track.title.toLowerCase().includes(searchWord)); loadedTracksInView = filteredSD.map(t => ({id: t.id, title: t.title}));
                 if(filteredSD.length === 0) { playlistContent.innerHTML = '<li style="color:var(--text-muted); font-size:0.8rem; padding:10px;">Keine Dateien gefunden.</li>'; return; }
@@ -488,18 +492,16 @@
         let prefix = type === 'sd' ? '📄' : '🌐'; let statusText = "🔵 Neu";
         if(maxDuration > 5 && currentPos > 2) { let pct = Math.floor((currentPos / maxDuration) * 100); if(pct >= 97) statusText = "✅ Fertig"; else statusText = `⏳ ${pct}% gehört (${formatTime(currentPos)} / ${formatTime(maxDuration)})`; }
         
-        // ABSOLUT SICHER: Das native HTML onclick im Button umgeht alle Event-Fehler im Browser!
         li.innerHTML = `
             <div class="item-left-block" onclick="handleTrackClick('${type}', '${id}')">
                 <div class="item-title">${prefix} ${title}</div>
                 <div class="item-status" id="status-label-${type}-${id}">${statusText}</div>
             </div>
-            <button class="btn" style="color:#ef4444; font-size:0.8rem; padding: 10px;" onclick="nativeDeleteTrack(event, '${id}', '${type}')">❌</button>
+            <button class="btn" style="color:var(--red-accent); font-size:1.1rem; padding: 12px; font-weight:bold;" onclick="nativeDeleteTrack(event, '${id}', '${type}')">❌</button>
         `;
         playlistContent.appendChild(li);
     }
 
-    // Abspiel-Logik sauber gekapselt
     window.handleTrackClick = function(type, id) {
         loadTrack(type, id, false); 
         audio.addEventListener('canplay', function playOnLoad() { audio.play(); playBtn.textContent = "⏸"; audio.removeEventListener('canplay', playOnLoad); });
@@ -535,44 +537,24 @@
 
     audio.addEventListener('ended', () => { playNext(); });
 
-    // UNKAPUTTBARER ORDNER-IMPORT (Sortiert erst am Ende sauber in einem Rutsch)
     function saveFilesToDB(fileList, isFolderImport = false) {
+        if(!db) { alert("Speichern nicht möglich: Die Datenbank wird vom Browser blockiert!"); return; }
         if(fileList.length === 0) return; statusMsg.style.display = "block";
         
-        // Konvertiere in ein echtes Array für stabiles Einlesen
         const fileArray = Array.from(fileList);
         fileArray.sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true, sensitivity: 'base'}));
         
-        const tx = db.transaction("local_tracks", "readwrite"); 
-        const store = tx.objectStore("local_tracks");
-        
+        const tx = db.transaction("local_tracks", "readwrite"); const store = tx.objectStore("local_tracks");
         let counter = 0;
         for(let i = 0; i < fileArray.length; i++) {
             const currentFile = fileArray[i];
             if (currentFile.type.startsWith('audio/') || currentFile.name.endsWith('.mp3')) {
-                let detectedFolder = "Einzelne Dateien"; 
-                if(isFolderImport && currentFile.webkitRelativePath) { 
-                    const pathParts = currentFile.webkitRelativePath.split('/'); 
-                    if(pathParts.length > 1) detectedFolder = pathParts[0]; 
-                }
-                store.add({ 
-                    title: currentFile.name.replace(/\.[^/.]+$/, ""), 
-                    fileData: currentFile, 
-                    lastPosition: 0, 
-                    totalDuration: 0, 
-                    folderName: detectedFolder 
-                });
+                let detectedFolder = "Einzelne Dateien"; if(isFolderImport && currentFile.webkitRelativePath) { const pathParts = currentFile.webkitRelativePath.split('/'); if(pathParts.length > 1) detectedFolder = pathParts[0]; }
+                store.add({ title: currentFile.name.replace(/\.[^/.]+$/, ""), fileData: currentFile, lastPosition: 0, totalDuration: 0, folderName: detectedFolder });
                 counter++;
             }
         }
-        tx.oncomplete = () => { 
-            statusMsg.style.display = "none"; 
-            fileInput.value = ''; 
-            folderInput.value = ''; 
-            renderCurrentTab(); 
-            alert(`${counter} Dateien erfolgreich sortiert eingelesen!`); 
-            showPage('player'); 
-        };
+        tx.oncomplete = () => { statusMsg.style.display = "none"; fileInput.value = ''; folderInput.value = ''; renderCurrentTab(); alert(`${counter} Dateien erfolgreich eingelesen!`); showPage('player'); };
     }
 
     fileInput.addEventListener('change', (e) => saveFilesToDB(e.target.files, false));
@@ -582,22 +564,20 @@
         e.preventDefault(); const url = document.getElementById('url-input').value; const title = document.getElementById('title-input').value; webEpisodes = webEpisodes.filter(t => t.id !== url); webEpisodes.push({ id: url, title: title }); localStorage.setItem('p_web_list', JSON.stringify(webEpisodes)); document.getElementById('web-form').reset(); switchTab('web'); loadTrack('web', url, false); alert("Link gespeichert!"); showPage('player');
     });
 
-    // UNKAPUTTBARE LÖSCHFUNKTION FÜR DAS X
     window.nativeDeleteTrack = function(event, id, type) {
         event.preventDefault();
-        event.stopPropagation(); // Blockiert das ungewollte Abspielen!
+        event.stopPropagation();
         
         if(!confirm("Möchtest du diesen Eintrag wirklich löschen?")) return;
 
         if(type === 'web') { 
             webEpisodes = webEpisodes.filter(t => String(t.id) !== String(id)); 
             localStorage.setItem('p_web_list', JSON.stringify(webEpisodes)); 
-            localStorage.removeItem('time_web_' + id); 
-            localStorage.removeItem('duration_web_' + id); 
+            localStorage.removeItem('time_web_' + id); localStorage.removeItem('duration_web_' + id); 
             checkIfCurrentDeleted(id, type); 
             renderCurrentTab(); 
         } else { 
-            // Erzwingt die ID als Zahl für die IndexedDB
+            if(!db) { alert("Datenbank nicht aktiv!"); return; }
             const request = db.transaction("local_tracks", "readwrite").objectStore("local_tracks").delete(Number(id));
             request.onsuccess = () => { 
                 checkIfCurrentDeleted(id, type); 
