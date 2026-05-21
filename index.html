@@ -145,10 +145,22 @@
         .playlist-item:hover { background-color: #334155; }
         .playlist-item.active { background-color: #2563eb; }
         
-        .item-left-block { display: flex; flex-direction: column; max-width: 310px; overflow: hidden; }
+        .item-left-block { display: flex; flex-direction: column; width: 100%; overflow: hidden; }
         .item-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600; }
         .item-status { font-size: 0.7rem; color: var(--text-muted); margin-top: 2px; display: flex; align-items: center; gap: 4px; }
         .playlist-item.active .item-status { color: #e0f2fe; }
+
+        .delete-btn {
+            background: none;
+            border: none;
+            color: var(--red-accent);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 0 10px;
+            opacity: 0.3;
+            transition: opacity 0.2s;
+        }
+        .delete-btn:hover { opacity: 1; }
 
         /* --- SEITE 2: MANAGEMENT --- */
         .page-header-title { font-size: 1.1rem; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
@@ -441,6 +453,17 @@
             };
         }
     }
+    
+    window.deleteSingleTrack = function(event, id) {
+        event.stopPropagation();
+        if(!db) return;
+        if(confirm("Möchtest du diese Datei wirklich aus der Liste entfernen?")) {
+            const tx = db.transaction("local_tracks", "readwrite");
+            tx.objectStore("local_tracks").delete(Number(id)).onsuccess = () => {
+                renderCurrentTab();
+            };
+        }
+    }
 
     window.resetDataUsage = function() { totalBytesUsed = 0; localStorage.setItem('p_data_bytes_used', 0); updateDataUsageUI(); }
 
@@ -497,7 +520,7 @@
                 <div class="item-title">${prefix} ${title}</div>
                 <div class="item-status" id="status-label-${type}-${id}">${statusText}</div>
             </div>
-            <button class="btn" style="color:var(--red-accent); font-size:1.1rem; padding: 12px; font-weight:bold;" onclick="nativeDeleteTrack(event, '${id}', '${type}')">❌</button>
+            ${type === 'sd' ? `<button class="delete-btn" onclick="deleteSingleTrack(event, '${id}')">×</button>` : ''}
         `;
         playlistContent.appendChild(li);
     }
@@ -524,7 +547,7 @@
 
     function applyTrackTime(timeToSet) { if(timeToSet > 0) { audio.addEventListener('loadedmetadata', function timeSetter() { if (audio.duration && audio.duration !== Infinity) { audio.currentTime = timeToSet; } audio.removeEventListener('loadedmetadata', timeSetter); }); } }
 
-    function updateActiveHighlighting() { document.querySelectorAll('.playlist-item').forEach(item => item.classList.remove('active')); const elements = playlistContent.children; for(let el of elements) { if(el.innerHTML && el.innerHTML.includes(`nativeDeleteTrack(event, '${currentTrackId}', '${currentTrackSource}')`)) { el.classList.add('active'); } } }
+    function updateActiveHighlighting() { document.querySelectorAll('.playlist-item').forEach(item => item.classList.remove('active')); const elements = playlistContent.children; for(let el of elements) { if(el.innerHTML && el.dataset.id === String(currentTrackId)) { el.classList.add('active'); } } }
 
     window.playNext = function() {
         if(loadedTracksInView.length <= 1 || !currentTrackId) return; let index = loadedTracksInView.findIndex(t => String(t.id) === String(currentTrackId));
@@ -563,30 +586,6 @@
     document.getElementById('web-form').addEventListener('submit', (e) => {
         e.preventDefault(); const url = document.getElementById('url-input').value; const title = document.getElementById('title-input').value; webEpisodes = webEpisodes.filter(t => t.id !== url); webEpisodes.push({ id: url, title: title }); localStorage.setItem('p_web_list', JSON.stringify(webEpisodes)); document.getElementById('web-form').reset(); switchTab('web'); loadTrack('web', url, false); alert("Link gespeichert!"); showPage('player');
     });
-
-    window.nativeDeleteTrack = function(event, id, type) {
-        event.preventDefault();
-        event.stopPropagation();
-        
-        if(!confirm("Möchtest du diesen Eintrag wirklich löschen?")) return;
-
-        if(type === 'web') { 
-            webEpisodes = webEpisodes.filter(t => String(t.id) !== String(id)); 
-            localStorage.setItem('p_web_list', JSON.stringify(webEpisodes)); 
-            localStorage.removeItem('time_web_' + id); localStorage.removeItem('duration_web_' + id); 
-            checkIfCurrentDeleted(id, type); 
-            renderCurrentTab(); 
-        } else { 
-            if(!db) { alert("Datenbank nicht aktiv!"); return; }
-            const request = db.transaction("local_tracks", "readwrite").objectStore("local_tracks").delete(Number(id));
-            request.onsuccess = () => { 
-                checkIfCurrentDeleted(id, type); 
-                renderCurrentTab(); 
-            }; 
-        }
-    }
-
-    function checkIfCurrentDeleted(id, type) { if(currentTrackSource === type && String(currentTrackId) === String(id)) { audio.src = ''; document.getElementById('player-title').textContent = "Keine Folge geladen"; playerCover.textContent = "📻"; localStorage.removeItem('p_source'); localStorage.removeItem('p_id'); currentTrackId = null; currentTrackSource = null; updateDataUsageUI(); } }
 
     function togglePlay() { if(!audio.src) return; if (audio.paused) { audio.play(); playBtn.textContent = "⏸"; } else { audio.pause(); playBtn.textContent = "▶"; } }
 
