@@ -9,6 +9,11 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <style>
+        html {
+            /* Verhindert das Neuladen der PWA beim Ziehen nach unten ganz oben */
+            overscroll-behavior-y: contain;
+        }
+
         :root {
             --bg-color: #0f172a;
             --card-bg: #1e293b;
@@ -37,6 +42,8 @@
             justify-content: center;
             min-height: 100vh;
             padding: 20px;
+            /* Doppelte Absicherung gegen das ungewollte Pull-to-Refresh */
+            overscroll-behavior-y: contain;
         }
 
         .app-container {
@@ -130,6 +137,7 @@
         .search-container { margin-bottom: 12px; }
         .search-input { width: 100%; padding: 8px 12px; background-color: #1a2232; border: 1px solid #334155; border-radius: 8px; color: var(--text-main); font-size: 0.85rem; outline: none; }
 
+        .tab-system { display: flex; flex-direction: column; }
         .tab-headers { display: flex; gap: 8px; border-bottom: 2px solid #334155; padding-bottom: 8px; margin-bottom: 12px; }
         .tab-link { background: none; border: none; color: var(--text-muted); font-size: 0.85rem; font-weight: 600; cursor: pointer; padding: 4px 8px; }
         .tab-link.active { color: var(--accent-color); border-bottom: 2px solid var(--accent-color); margin-bottom: -10px; }
