@@ -1,10 +1,10 @@
-const CACHE_NAME = 'audio-player-v3';
+const CACHE_NAME = 'audio-player-v4';
 const ASSETS = [
   'Podcast.html',
-  'manifest.json'
+  'manifest.json',
+  'icon.svg'
 ];
 
-// Installieren und App-Hülle in den Cache laden
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -13,7 +13,6 @@ self.addEventListener('install', (e) => {
   );
 });
 
-// Alten Cache löschen, wenn sich die Version ändert
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then((keys) => {
@@ -28,9 +27,7 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Netzwerk-Anfragen abfangen
 self.addEventListener('fetch', (e) => {
-  // Radio-Streams und Datei-Blobs ignorieren, nur App-Hülle cachen
   if (e.request.url.startsWith('http') && !e.request.url.includes('.mp3') && !e.request.url.includes('stream')) {
     e.respondWith(
       caches.match(e.request).then((cachedResponse) => {
@@ -39,5 +36,3 @@ self.addEventListener('fetch', (e) => {
     );
   }
 });
-
-
