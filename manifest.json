@@ -1,9 +1,8 @@
-
 {
   "name": "Hörbuch & Radio Player",
   "short_name": "AudioPlayer",
   "description": "Dein ultimativer Player für lokale Hörbücher und Radio Live-Streams",
-  "start_url": "Podcast.html",
+  "start_url": "index.html",
   "display": "standalone",
   "background_color": "#0f172a",
   "theme_color": "#1e293b",
