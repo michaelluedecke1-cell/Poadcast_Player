@@ -244,7 +244,7 @@
             <form id="web-form">
                 <div class="input-group"><label for="title-input">Name des Senders / Podcasts</label><input type="text" id="title-input" required></div>
                 <div class="input-group"><label for="url-input">Streaming-Link / URL (z.B. Icecast MP3-Stream)</label><input type="url" id="url-input" placeholder="https://..." required></div>
-                <button type="submit" class="action-btn btn-blue">🔗 In Senderliste speichern</button>
+                <button type="submit" class="action-btn btn-blue">🔗 In Senderliste保存</button>
             </form>
         </div>
         <button class="action-btn btn-outline" onclick="showPage('player')">↩️ Zurück zum Player</button>
@@ -440,7 +440,6 @@
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `player_sicherung_gesamt.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
 
-    // VOLLSTÄNDIG ABWÄRTSKOMPATIBLES IMPORT-SYSTEM (AKZEPTIERT VERSION 2 & 3)
     backupInput.addEventListener('change', (e) => {
         const file = e.target.files[0]; if(!file) return;
         const reader = new FileReader();
@@ -448,24 +447,20 @@
             try {
                 const data = JSON.parse(evt.target.result);
                 
-                // Falls es ein altes v2 oder v3 Backup ist, lade die Radioliste
                 if (data.webList && Array.isArray(data.webList)) {
                     webEpisodes = data.webList;
                     localStorage.setItem('p_web_list', JSON.stringify(webEpisodes));
                 }
 
-                // Falls es das v3 Format ist, importiere direkt die Hörstände
                 if (data.playbackProgress) { 
                     for (const [k, v] of Object.entries(data.playbackProgress)) { 
                         localStorage.setItem(k, v); 
                     } 
                 }
                 
-                // Altes v2 Format in das neue System übertragen
                 if (data.version === 2 && data.sdStatistics && Array.isArray(data.sdStatistics)) {
                     data.sdStatistics.forEach(item => {
                         if (item.lastPosition > 0 && item.title) {
-                            // Erzeuge Pfad-IDs für das neue System
                             let virtualPath = `${item.folderName}/${item.title}`;
                             localStorage.setItem('time_linked_' + virtualPath, item.lastPosition);
                             if(item.totalDuration) localStorage.setItem('duration_linked_' + virtualPath, item.totalDuration);
@@ -749,6 +744,15 @@
     else document.getElementById('sd-picker-unsupported').classList.remove('hidden');
     
     if(currentTrackId) loadTrack(currentTrackSource, currentTrackId, true);
+
+    // AKTIVIERUNG FÜR DEN OFFLINE SERVICE WORKER
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('Service Worker registriert!', reg))
+                .catch(err => console.error('Service Worker Fehler', err));
+        });
+    }
 </script>
 </body>
 </html>
