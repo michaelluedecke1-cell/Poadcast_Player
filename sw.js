@@ -1,6 +1,6 @@
-const CACHE_NAME = 'audio-player-v4';
+const CACHE_NAME = 'audio-player-v5';
 const ASSETS = [
-  'Podcast.html',
+  'index.html',
   'manifest.json',
   'icon.svg'
 ];
